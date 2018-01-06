@@ -54,11 +54,17 @@ func run() error {
 	}
 
 	sgURL := evalSGURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, isDir)
-	if runtime.GOOS != "linux" {
+	switch runtime.GOOS {
+	case "linux":
+		if err := exec.Command("xdg-open", sgURL).Run(); err != nil {
+			return fmt.Errorf("exec `xdg-open %s` failed: %s", sgURL, err)
+		}
+	case "darwin":
+		if err := exec.Command("open", sgURL).Run(); err != nil {
+			return fmt.Errorf("open %s failed: %s", sgURL, err)
+		}
+	default:
 		return fmt.Errorf("OS %s unsupported", runtime.GOOS)
-	}
-	if err := exec.Command("xdg-open", sgURL).Run(); err != nil {
-		return fmt.Errorf("exec `xdg-open %s` failed: %s", sgURL, err)
 	}
 	return nil
 }
