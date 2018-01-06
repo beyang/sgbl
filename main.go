@@ -38,22 +38,31 @@ func run() error {
 		}
 	}
 
-	repoURI, err := evalRepoURI()
-	if err != nil {
-		return err
-	}
-
-	var subpath string
+	var pathArg string
 	if len(os.Args) == 2 {
-		subpath = os.Args[1]
+		pathArg = os.Args[1]
 	}
-
-	relPath, isDir, err := evalRelPathFromRepoRoot(subpath)
+	abspath, err := filepath.Abs(pathArg)
 	if err != nil {
 		return err
 	}
 
-	sgURL := evalSGURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, isDir)
+	finfo, err := os.Lstat(abspath)
+	if err != nil {
+		return err
+	}
+
+	repoURI, err := evalRepoURI(abspath, finfo.IsDir())
+	if err != nil {
+		return err
+	}
+
+	relPath, err := evalRelPathFromRepoRoot(abspath, finfo.IsDir())
+	if err != nil {
+		return err
+	}
+
+	sgURL := evalSGURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, finfo.IsDir())
 	switch runtime.GOOS {
 	case "linux":
 		if err := exec.Command("xdg-open", sgURL).Run(); err != nil {
@@ -111,48 +120,42 @@ func evalSGURL(sgHost, repoURI, relPath string, isDir bool) string {
 	return fmt.Sprintf("%s/%s/-/blob/%s", sgHost, repoURI, relPath)
 }
 
-// evalRelPathFromRepoRoot computes the relative path from the repository root by finding
-// the absolute path indicated by $PWD/$subpath, taking that relative to the repository
-// root, and converting OS-specific separators to "/". Also returns whether the path
-// indicated is a directory.
-func evalRelPathFromRepoRoot(subpath string) (relPath string, isDir bool, err error) {
-	out, err := exec.Command("git", "rev-parse", "--show-toplevel").CombinedOutput()
+// evalRelPathFromRepoRoot computes the relative path from the repository root by
+// relativizing the abspath to the repository
+// root, and converting OS-specific separators to "/".
+func evalRelPathFromRepoRoot(abspath string, isDir bool) (relPath string, err error) {
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	if isDir {
+		cmd.Dir = abspath
+	} else {
+		cmd.Dir = filepath.Dir(abspath)
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", false, fmt.Errorf("unknown `git rev-parse --show-toplevel` error: %s, output was:\n%s", err, string(out))
+		return "", fmt.Errorf("unknown `git rev-parse --show-toplevel` error: %s, output was:\n%s", err, string(out))
 	}
 	rootDir := string(bytes.TrimSpace(out))
-
-	pwd, err := os.Getwd()
-	if err != nil {
-		return "", false, err
+	if rootDir == abspath {
+		return "", nil
 	}
-
-	fp := filepath.Clean(filepath.Join(pwd, subpath))
-	if rootDir == fp {
-		return "", true, nil
-	}
-	relPath, err = filepath.Rel(rootDir, fp)
+	relPath, err = filepath.Rel(rootDir, abspath)
 	if err != nil {
-		return "", false, err
+		return "", err
 	}
 	if relPath == ".." || strings.HasPrefix(relPath, fmt.Sprintf("..%c", filepath.Separator)) {
-		return "", false, errors.New("file path points outside current repository")
+		return "", errors.New("file path points outside current repository")
 	}
-	relPath = strings.Replace(relPath, string(filepath.Separator), "/", -1)
-
-	if subpath == "" {
-		return relPath, false, nil
-	}
-
-	fileinfo, err := os.Lstat(subpath)
-	if err != nil {
-		return "", false, err
-	}
-	return relPath, fileinfo.IsDir(), nil
+	return strings.Replace(relPath, string(filepath.Separator), "/", -1), nil
 }
 
-func evalRepoURI() (string, error) {
-	out, err := exec.Command("git", "config", "--get", "remote.origin.url").CombinedOutput()
+func evalRepoURI(abspath string, isDir bool) (string, error) {
+	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
+	if isDir {
+		cmd.Dir = abspath
+	} else {
+		cmd.Dir = filepath.Dir(abspath)
+	}
+	out, err := cmd.CombinedOutput()
 	if err != nil {
 		if len(bytes.TrimSpace(out)) == 0 {
 			return "", errors.New("no git remote origin found")
