@@ -33,10 +33,16 @@ func main() {
 }
 
 func run() error {
-	searchQuery := flag.String("search", "", "a search query")
+	searchQueryPtr := flag.String("search", "", "a search query")
 
 	flag.Parse()
-	fmt.Println(*searchQuery)
+
+	var searchQuery string
+	if searchQueryPtr != nil {
+		searchQuery = *searchQueryPtr
+	}
+
+	var err error
 
 	cfg, err := readConfig()
 	if err != nil {
@@ -50,6 +56,7 @@ func run() error {
 	if len(args) == 1 {
 		pathArg = args[0]
 	}
+
 	abspath, err := filepath.Abs(pathArg)
 	if err != nil {
 		return err
@@ -70,11 +77,11 @@ func run() error {
 		return err
 	}
 
-	sgURL := evalSGURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, finfo.IsDir())
-
-	if searchQuery != nil {
-		sgURL += "?" + buildSearchURLQuery(*searchQuery)
+	if relPath == "" && pathArg == "." {
+		relPath = "/"
 	}
+
+	sgURL := evalSGURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, searchQuery, finfo.IsDir())
 
 	switch runtime.GOOS {
 	case "linux":
@@ -127,14 +134,26 @@ func readConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-func evalSGURL(sgHost, repoURI, relPath string, isDir bool) string {
-	if isDir {
+func evalSGURL(sgHost, repoURI, relPath, query string, isDir bool) string {
+	var url string
+
+	if relPath == "" && query != "" {
+		url = fmt.Sprintf("%s/search", sgHost)
+	} else if isDir {
 		if relPath == "" || relPath == "/" {
-			return fmt.Sprintf("%s/%s", sgHost, repoURI)
+			url = fmt.Sprintf("%s/%s", sgHost, repoURI)
+		} else {
+			url = fmt.Sprintf("%s/%s/-/tree/%s", sgHost, repoURI, relPath)
 		}
-		return fmt.Sprintf("%s/%s/-/tree/%s", sgHost, repoURI, relPath)
+	} else {
+		url = fmt.Sprintf("%s/%s/-/blob/%s", sgHost, repoURI, relPath)
 	}
-	return fmt.Sprintf("%s/%s/-/blob/%s", sgHost, repoURI, relPath)
+
+	if query != "" {
+		url += "?" + buildSearchURLQuery(query)
+	}
+
+	return url
 }
 
 // evalRelPathFromRepoRoot computes the relative path from the repository root by
