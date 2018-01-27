@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -31,6 +33,11 @@ func main() {
 }
 
 func run() error {
+	searchQuery := flag.String("search", "", "a search query")
+
+	flag.Parse()
+	fmt.Println(*searchQuery)
+
 	cfg, err := readConfig()
 	if err != nil {
 		if err != nil {
@@ -39,8 +46,9 @@ func run() error {
 	}
 
 	var pathArg string
-	if len(os.Args) == 2 {
-		pathArg = os.Args[1]
+	args := flag.Args()
+	if len(args) == 1 {
+		pathArg = args[0]
 	}
 	abspath, err := filepath.Abs(pathArg)
 	if err != nil {
@@ -63,6 +71,11 @@ func run() error {
 	}
 
 	sgURL := evalSGURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, finfo.IsDir())
+
+	if searchQuery != nil {
+		sgURL += "?" + buildSearchURLQuery(*searchQuery)
+	}
+
 	switch runtime.GOOS {
 	case "linux":
 		if err := exec.Command("xdg-open", sgURL).Run(); err != nil {
@@ -101,7 +114,11 @@ func readConfig() (*Config, error) {
 		}
 		return nil, err
 	}
-	defer cfgFile.Close()
+	defer func() {
+		if err := cfgFile.Close(); err != nil {
+			fmt.Errorf("unexpected error: %v", err)
+		}
+	}()
 
 	var cfg Config
 	if err := json.NewDecoder(cfgFile).Decode(&cfg); err != nil {
@@ -185,4 +202,19 @@ func evalRepoURI(abspath string, isDir bool) (string, error) {
 	}
 
 	return repoURI, nil
+}
+
+func buildSearchURLQuery(query string) string {
+	// Compile here not globally so we don't waste time if no search specified
+	slashRe := regexp.MustCompile("%2F")
+	colonRe := regexp.MustCompile("%3A")
+
+	qs := make(url.Values)
+	qs.Add("q", query)
+
+	encoded := qs.Encode()
+	encoded = slashRe.ReplaceAllString(encoded, "/")
+	encoded = colonRe.ReplaceAllString(encoded, ";")
+
+	return encoded
 }
