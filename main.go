@@ -33,14 +33,12 @@ func main() {
 }
 
 func run() error {
-	searchQueryPtr := flag.String("search", "", "a search query")
+	searchQuery := flag.String("search", "", "a search query")
+	posFlag := flag.String("pos", "", "the position you wish to open the file at")
+	lineFlag := flag.String("line", "", "the line you wish to open the file at")
+	colFlag := flag.String("col", "", "the column you wish to open the file at")
 
 	flag.Parse()
-
-	var searchQuery string
-	if searchQueryPtr != nil {
-		searchQuery = *searchQueryPtr
-	}
 
 	var err error
 
@@ -81,7 +79,13 @@ func run() error {
 		relPath = "/"
 	}
 
-	sgURL := evalSGURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, searchQuery, finfo.IsDir())
+	sgURL := evalSGURL(sgURLOptions{
+		sgHost:  cfg.sourcegraphURLForRepo(repoURI),
+		repoURI: repoURI,
+		relPath: relPath,
+		query:   *searchQuery,
+		pos:     buildPos(*posFlag, *lineFlag, *colFlag),
+	})
 
 	switch runtime.GOOS {
 	case "linux":
@@ -134,23 +138,36 @@ func readConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-func evalSGURL(sgHost, repoURI, relPath, query string, isDir bool) string {
+type sgURLOptions struct {
+	sgHost  string
+	repoURI string
+	relPath string
+	query   string
+	pos     string
+	isDir   bool
+}
+
+func evalSGURL(opts sgURLOptions) string {
 	var url string
 
-	if relPath == "" && query != "" {
-		url = fmt.Sprintf("%s/search", sgHost)
-	} else if isDir {
-		if relPath == "" || relPath == "/" {
-			url = fmt.Sprintf("%s/%s", sgHost, repoURI)
+	if opts.relPath == "" && opts.query != "" {
+		url = fmt.Sprintf("%s/search", opts.sgHost)
+	} else if opts.isDir {
+		if opts.relPath == "" || opts.relPath == "/" {
+			url = fmt.Sprintf("%s/%s", opts.sgHost, opts.repoURI)
 		} else {
-			url = fmt.Sprintf("%s/%s/-/tree/%s", sgHost, repoURI, relPath)
+			url = fmt.Sprintf("%s/%s/-/tree/%s", opts.sgHost, opts.repoURI, opts.relPath)
 		}
 	} else {
-		url = fmt.Sprintf("%s/%s/-/blob/%s", sgHost, repoURI, relPath)
+		url = fmt.Sprintf("%s/%s/-/blob/%s", opts.sgHost, opts.repoURI, opts.relPath)
 	}
 
-	if query != "" {
-		url += "?" + buildSearchURLQuery(query)
+	if opts.pos != "" {
+		url += "#" + opts.pos
+	}
+
+	if opts.query != "" {
+		url += "?" + buildSearchURLQuery(opts.query)
 	}
 
 	return url
@@ -236,4 +253,20 @@ func buildSearchURLQuery(query string) string {
 	encoded = colonRe.ReplaceAllString(encoded, ";")
 
 	return encoded
+}
+
+func buildPos(pos, line, col string) string {
+	var p string
+
+	if pos != "" {
+		p = fmt.Sprintf("L%s", pos)
+	} else if line != "" {
+		if col != "" {
+			p = fmt.Sprintf("L%s:%s", line, col)
+		} else {
+			p = fmt.Sprintf("L%s", line)
+		}
+	}
+
+	return p
 }
