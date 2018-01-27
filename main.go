@@ -250,7 +250,7 @@ func buildSearchURLQuery(query string) string {
 
 	encoded := qs.Encode()
 	encoded = slashRe.ReplaceAllString(encoded, "/")
-	encoded = colonRe.ReplaceAllString(encoded, ";")
+	encoded = colonRe.ReplaceAllString(encoded, ":")
 
 	return encoded
 }
