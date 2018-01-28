@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"net/url"
@@ -11,6 +12,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 )
@@ -31,6 +33,10 @@ func main() {
 }
 
 func run() error {
+	searchQuery := flag.String("search", "", "a search query")
+	posFlag := flag.String("pos", "", "the position at which to open the file, formatted as \"L${line}:${col}\"")
+	flag.Parse()
+
 	cfg, err := readConfig()
 	if err != nil {
 		if err != nil {
@@ -39,9 +45,11 @@ func run() error {
 	}
 
 	var pathArg string
-	if len(os.Args) == 2 {
-		pathArg = os.Args[1]
+	args := flag.Args()
+	if len(args) == 1 {
+		pathArg = args[0]
 	}
+
 	abspath, err := filepath.Abs(pathArg)
 	if err != nil {
 		return err
@@ -62,7 +70,12 @@ func run() error {
 		return err
 	}
 
-	sgURL := evalSGURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, finfo.IsDir())
+	sgURL := evalFilePlusURL(
+		evalFileURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, finfo.IsDir()),
+		*searchQuery,
+		*posFlag,
+	)
+
 	switch runtime.GOOS {
 	case "linux":
 		if err := exec.Command("xdg-open", sgURL).Run(); err != nil {
@@ -110,7 +123,18 @@ func readConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-func evalSGURL(sgHost, repoURI, relPath string, isDir bool) string {
+func evalFilePlusURL(fileURL string, query string, pos string) string {
+	url := fileURL
+	if query != "" {
+		url += "?" + evalSearchURLQuery(query)
+	}
+	if pos != "" {
+		url += "#" + pos
+	}
+	return url
+}
+
+func evalFileURL(sgHost, repoURI, relPath string, isDir bool) string {
 	if isDir {
 		if relPath == "" || relPath == "/" {
 			return fmt.Sprintf("%s/%s", sgHost, repoURI)
@@ -185,4 +209,19 @@ func evalRepoURI(abspath string, isDir bool) (string, error) {
 	}
 
 	return repoURI, nil
+}
+
+func evalSearchURLQuery(query string) string {
+	// Compile here not globally so we don't waste time if no search specified
+	slashRe := regexp.MustCompile("%2F")
+	colonRe := regexp.MustCompile("%3A")
+
+	qs := make(url.Values)
+	qs.Add("q", query)
+
+	encoded := qs.Encode()
+	encoded = slashRe.ReplaceAllString(encoded, "/")
+	encoded = colonRe.ReplaceAllString(encoded, ":")
+
+	return encoded
 }
