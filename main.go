@@ -34,13 +34,8 @@ func main() {
 
 func run() error {
 	searchQuery := flag.String("search", "", "a search query")
-	posFlag := flag.String("pos", "", "the position you wish to open the file at")
-	lineFlag := flag.String("line", "", "the line you wish to open the file at")
-	colFlag := flag.String("col", "", "the column you wish to open the file at")
-
+	posFlag := flag.String("pos", "", "the position at which to open the file, formatted as \"L${line}:${col}\"")
 	flag.Parse()
-
-	var err error
 
 	cfg, err := readConfig()
 	if err != nil {
@@ -75,17 +70,11 @@ func run() error {
 		return err
 	}
 
-	if relPath == "" && pathArg == "." {
-		relPath = "/"
-	}
-
-	sgURL := evalSGURL(sgURLOptions{
-		sgHost:  cfg.sourcegraphURLForRepo(repoURI),
-		repoURI: repoURI,
-		relPath: relPath,
-		query:   *searchQuery,
-		pos:     buildPos(*posFlag, *lineFlag, *colFlag),
-	})
+	sgURL := evalFilePlusURL(
+		evalFileURL(cfg.sourcegraphURLForRepo(repoURI), repoURI, relPath, finfo.IsDir()),
+		*searchQuery,
+		*posFlag,
+	)
 
 	switch runtime.GOOS {
 	case "linux":
@@ -125,11 +114,7 @@ func readConfig() (*Config, error) {
 		}
 		return nil, err
 	}
-	defer func() {
-		if err := cfgFile.Close(); err != nil {
-			fmt.Errorf("unexpected error: %v", err)
-		}
-	}()
+	defer cfgFile.Close()
 
 	var cfg Config
 	if err := json.NewDecoder(cfgFile).Decode(&cfg); err != nil {
@@ -138,39 +123,25 @@ func readConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-type sgURLOptions struct {
-	sgHost  string
-	repoURI string
-	relPath string
-	query   string
-	pos     string
-	isDir   bool
+func evalFilePlusURL(fileURL string, query string, pos string) string {
+	url := fileURL
+	if query != "" {
+		url += "?" + evalSearchURLQuery(query)
+	}
+	if pos != "" {
+		url += "#" + pos
+	}
+	return url
 }
 
-func evalSGURL(opts sgURLOptions) string {
-	var url string
-
-	if opts.relPath == "" && opts.query != "" {
-		url = fmt.Sprintf("%s/search", opts.sgHost)
-	} else if opts.isDir {
-		if opts.relPath == "" || opts.relPath == "/" {
-			url = fmt.Sprintf("%s/%s", opts.sgHost, opts.repoURI)
-		} else {
-			url = fmt.Sprintf("%s/%s/-/tree/%s", opts.sgHost, opts.repoURI, opts.relPath)
+func evalFileURL(sgHost, repoURI, relPath string, isDir bool) string {
+	if isDir {
+		if relPath == "" || relPath == "/" {
+			return fmt.Sprintf("%s/%s", sgHost, repoURI)
 		}
-	} else {
-		url = fmt.Sprintf("%s/%s/-/blob/%s", opts.sgHost, opts.repoURI, opts.relPath)
+		return fmt.Sprintf("%s/%s/-/tree/%s", sgHost, repoURI, relPath)
 	}
-
-	if opts.pos != "" {
-		url += "#" + opts.pos
-	}
-
-	if opts.query != "" {
-		url += "?" + buildSearchURLQuery(opts.query)
-	}
-
-	return url
+	return fmt.Sprintf("%s/%s/-/blob/%s", sgHost, repoURI, relPath)
 }
 
 // evalRelPathFromRepoRoot computes the relative path from the repository root by
@@ -240,7 +211,7 @@ func evalRepoURI(abspath string, isDir bool) (string, error) {
 	return repoURI, nil
 }
 
-func buildSearchURLQuery(query string) string {
+func evalSearchURLQuery(query string) string {
 	// Compile here not globally so we don't waste time if no search specified
 	slashRe := regexp.MustCompile("%2F")
 	colonRe := regexp.MustCompile("%3A")
@@ -253,20 +224,4 @@ func buildSearchURLQuery(query string) string {
 	encoded = colonRe.ReplaceAllString(encoded, ":")
 
 	return encoded
-}
-
-func buildPos(pos, line, col string) string {
-	var p string
-
-	if pos != "" {
-		p = fmt.Sprintf("L%s", pos)
-	} else if line != "" {
-		if col != "" {
-			p = fmt.Sprintf("L%s:%s", line, col)
-		} else {
-			p = fmt.Sprintf("L%s", line)
-		}
-	}
-
-	return p
 }

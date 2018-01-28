@@ -10,10 +10,9 @@ go get github.com/beyang/sg
 
 ## Configuration
 
-You can configure `sg` to search over multiple [Sourcegraph](https://about.sourcegraph.com) and specify
-specific repositores.
+You can configure `sg` to work with private [Sourcegraph](https://about.sourcegraph.com) instances in addition to Sourcegraph.com.
 
-Do this by saving a `json` file to `~/.sg-config` with the following shape:
+To do this, save a JSON file like the following to `~/.sg-config`:
 
 ```json
 {
