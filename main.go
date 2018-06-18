@@ -24,7 +24,10 @@ func main() {
 
 func runRoot(args []string) {
 	f := flag.NewFlagSet("root", flag.ExitOnError)
-	f.Usage = printUsage
+	f.Usage = func() {
+		fmt.Fprintln(os.Stderr, `Usage: sg {open|search} ...`)
+		f.PrintDefaults()
+	}
 	if err := f.Parse(args); err != nil {
 		f.Usage()
 		os.Exit(1)
@@ -42,13 +45,9 @@ func runRoot(args []string) {
 	case "search":
 		cfg.runSearch(args[1:])
 	default:
-		printUsage()
+		f.Usage()
 		os.Exit(1)
 	}
-}
-
-func printUsage() {
-	fmt.Fprintln(os.Stderr, `sg {open|search} ...`)
 }
 
 func readConfig() (*Config, error) {

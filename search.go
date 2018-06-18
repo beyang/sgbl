@@ -11,7 +11,10 @@ import (
 
 func (c *Config) runSearch(args []string) {
 	f := flag.NewFlagSet("search", flag.ExitOnError)
-	f.Usage = printSearchUsage
+	f.Usage = func() {
+		fmt.Fprintln(os.Stderr, `Usage: sg search [-pos POS] [-path PATH] <query>`)
+		f.PrintDefaults()
+	}
 	posFlag := f.String("pos", "", "the position at which to open the file, formatted as \"L${line}:${col}\"")
 	pathFlag := f.String("path", "", "the path at which to make this search")
 	if err := f.Parse(args); err != nil {
@@ -23,10 +26,6 @@ func (c *Config) runSearch(args []string) {
 		fmt.Fprintln(os.Stderr, "Error: %s", err)
 		os.Exit(1)
 	}
-}
-
-func printSearchUsage() {
-	fmt.Fprintln(os.Stderr, `sg search [-pos POS] [-path PATH] <query>`)
 }
 
 func (c *Config) search(query string, pathArg string, pos string) error {

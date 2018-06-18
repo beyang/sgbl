@@ -11,7 +11,10 @@ import (
 
 func (c *Config) runOpen(args []string) {
 	f := flag.NewFlagSet("open", flag.ExitOnError)
-	f.Usage = printOpenUsage
+	f.Usage = func() {
+		fmt.Fprintln(os.Stderr, `Usage: sg open [-pos POS] <file>`)
+		f.PrintDefaults()
+	}
 	posFlag := f.String("pos", "", "the position at which to open the file, formatted as \"L${line}:${col}\"")
 	if err := f.Parse(args); err != nil {
 		f.Usage()
@@ -23,10 +26,6 @@ func (c *Config) runOpen(args []string) {
 		fmt.Fprintln(os.Stderr, "Error: %s", err)
 		os.Exit(1)
 	}
-}
-
-func printOpenUsage() {
-	fmt.Fprintln(os.Stderr, `sg open [-pos POS] <file>`)
 }
 
 func (c *Config) open(pathArg string, pos string) error {
