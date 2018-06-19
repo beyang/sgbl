@@ -23,7 +23,7 @@ func (c *Config) runOpen(args []string) {
 
 	pathArg := f.Arg(0)
 	if err := c.open(pathArg, *posFlag); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: %s", err)
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
 	}
 }

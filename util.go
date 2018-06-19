@@ -32,21 +32,28 @@ func evalFileURL(sgHost, repoURI, relPath string, isDir bool) string {
 	return fmt.Sprintf("%s/%s/-/blob/%s", sgHost, repoURI, relPath)
 }
 
-// evalRelPathFromRepoRoot computes the relative path from the repository root by
-// relativizing the abspath to the repository
-// root, and converting OS-specific separators to "/".
-func evalRelPathFromRepoRoot(abspath string, isDir bool) (relPath string, err error) {
+func evalAbsRepoRoot(path string, isDir bool) (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
 	if isDir {
-		cmd.Dir = abspath
+		cmd.Dir = path
 	} else {
-		cmd.Dir = filepath.Dir(abspath)
+		cmd.Dir = filepath.Dir(path)
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("unknown `git rev-parse --show-toplevel` error: %s, output was:\n%s", err, string(out))
 	}
-	rootDir := string(bytes.TrimSpace(out))
+	return string(bytes.TrimSpace(out)), nil
+}
+
+// evalRelPathFromRepoRoot computes the relative path from the repository root by
+// relativizing the abspath to the repository
+// root, and converting OS-specific separators to "/".
+func evalRelPathFromRepoRoot(abspath string, isDir bool) (relPath string, err error) {
+	rootDir, err := evalAbsRepoRoot(abspath, isDir)
+	if err != nil {
+		return "", err
+	}
 	if rootDir == abspath {
 		return "", nil
 	}
@@ -60,6 +67,10 @@ func evalRelPathFromRepoRoot(abspath string, isDir bool) (relPath string, err er
 	return strings.Replace(relPath, string(filepath.Separator), "/", -1), nil
 }
 
+// evalRepoURI returns the Sourcegraph repository URI corresponding to the git repository that
+// contains the file/directory specified by `abspath`.
+//
+// TODO: this should take into account `repositoryPathPattern`s.
 func evalRepoURI(abspath string, isDir bool) (string, error) {
 	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
 	if isDir {

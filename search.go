@@ -23,7 +23,7 @@ func (c *Config) runSearch(args []string) {
 	}
 	query := f.Arg(0)
 	if err := c.search(query, *pathFlag, *posFlag); err != nil {
-		fmt.Fprintln(os.Stderr, "Error: %s", err)
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
 	}
 }
