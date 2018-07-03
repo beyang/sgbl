@@ -7,22 +7,34 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
 func (c *Config) runLocal(args []string) {
 	f := flag.NewFlagSet("local", flag.ExitOnError)
 	filesFlag := f.String("files", "", "colon-separated list of files to use as anchors for the search for the local file")
+	positionFlag := f.Bool("pos", false, "if true, prints the zero-indexed line/offset, instead of the file")
 	f.Usage = func() {
 		fmt.Fprintln(os.Stderr, `Usage: sg local <url>
 
-Translates a Sourcegraph URL into a local file path
-`)
+Translates a Sourcegraph URL into a local file path`)
 		f.PrintDefaults()
 	}
 	if err := f.Parse(args); err != nil {
 		f.Usage()
 		os.Exit(1)
+	}
+
+	if *positionFlag {
+		line, col, err := localPosition(f.Arg(0))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("%d:%d\n", line, col)
+		os.Exit(0)
 	}
 
 	var files []string
@@ -34,6 +46,42 @@ Translates a Sourcegraph URL into a local file path
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
 	}
+}
+
+var posRegex = regexp.MustCompile(`^L([0-9]+)(?:\:([0-9]+))?$`)
+
+func localPosition(rawURL string) (int, int, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return 0, 0, err
+	}
+	lp := u.Fragment
+	matches := posRegex.FindStringSubmatch(lp)
+	if len(matches) <= 1 {
+		return 0, 0, nil
+	}
+	if len(matches) == 2 {
+		line, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return 0, 0, err
+		}
+		return line, 0, nil
+	}
+	if len(matches) == 3 {
+		line, err := strconv.Atoi(matches[1])
+		if err != nil {
+			return 0, 0, err
+		}
+		if matches[2] == "" {
+			return line, 0, nil
+		}
+		col, err := strconv.Atoi(matches[2])
+		if err != nil {
+			return 0, 0, err
+		}
+		return line, col, nil
+	}
+	return 0, 0, fmt.Errorf("Found more than 2 submatches: %+v", matches)
 }
 
 func (c *Config) local(rawURL string, anchorPaths []string) error {
