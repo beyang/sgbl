@@ -72,20 +72,45 @@ func evalRelPathFromRepoRoot(abspath string, isDir bool) (relPath string, err er
 //
 // TODO: this should take into account `repositoryPathPattern`s.
 func evalRepoURI(abspath string, isDir bool) (string, error) {
-	cmd := exec.Command("git", "config", "--get", "remote.origin.url")
-	if isDir {
-		cmd.Dir = abspath
-	} else {
-		cmd.Dir = filepath.Dir(abspath)
-	}
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if len(bytes.TrimSpace(out)) == 0 {
-			return "", errors.New("no git remote origin found")
+	var remotes []string
+	{
+		remotesRaw, err := exec.Command("git", "remote").CombinedOutput()
+		if err != nil {
+			return "", err
 		}
-		return "", fmt.Errorf("unknown `git config --get remote.origin.url` error: %s, output was:\n%s", err, string(out))
+		for _, r := range strings.Split(string(remotesRaw), "\n") {
+			if r2 := strings.TrimSpace(r); r2 != "" {
+				if r2 == "origin" {
+					remotes = append([]string{"origin"}, remotes...)
+				} else {
+					remotes = append(remotes, r2)
+				}
+			}
+		}
 	}
-	rawRemoteURL := strings.TrimSpace(string(out))
+	if len(remotes) == 0 {
+		return "", errors.New("no git remote origin found")
+	}
+
+	var dir string
+	if isDir {
+		dir = abspath
+	} else {
+		dir = filepath.Dir(abspath)
+	}
+	var (
+		rawRemoteURL string
+		err          error
+	)
+	for _, remote := range remotes {
+		rawRemoteURL, err = evalRepoURIWithRemote(dir, remote)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil {
+		return "", err
+	}
 
 	var remoteURL *url.URL
 	if strings.HasPrefix(rawRemoteURL, "git@github.com:") {
@@ -108,6 +133,19 @@ func evalRepoURI(abspath string, isDir bool) (string, error) {
 	}
 
 	return repoURI, nil
+}
+
+func evalRepoURIWithRemote(dir, remote string) (string, error) {
+	cmd := exec.Command("git", "config", "--get", fmt.Sprintf("remote.%s.url", remote))
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(bytes.TrimSpace(out)) == 0 {
+			return "", fmt.Errorf("no git remote %s found", remote)
+		}
+		return "", fmt.Errorf("unknown `git config --get remote.%s.url` error: %s, output was:\n%s", remote, err, string(out))
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 func evalSearchURLQuery(query string) string {
