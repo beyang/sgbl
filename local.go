@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"net/url"
@@ -10,6 +9,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 func (c *Config) runLocal(args []string) {
@@ -53,7 +54,7 @@ var posRegex = regexp.MustCompile(`^L([0-9]+)(?:\:([0-9]+))?$`)
 func localPosition(rawURL string) (int, int, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, errors.Wrap(err, "failed to extract local position")
 	}
 	lp := u.Fragment
 	matches := posRegex.FindStringSubmatch(lp)
@@ -120,7 +121,7 @@ func (c *Config) local(rawURL string, anchorPaths []string) error {
 func extractRepoPath(rawURL string) (r, p string, err error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return "", "", err
+		return "", "", errors.Wrap(err, "failed to extract repo path")
 	}
 
 	if idx := strings.Index(u.Path, "/-/blob/"); idx >= 0 {

@@ -2,13 +2,14 @@ package main
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net/url"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 func evalFilePlusURL(fileURL string, query string, pos string) string {
@@ -112,27 +113,21 @@ func evalRepoURI(abspath string, isDir bool) (string, error) {
 		return "", err
 	}
 
-	var remoteURL *url.URL
+	return evalRepoURIFromRawRemoteURL(rawRemoteURL)
+}
+
+func evalRepoURIFromRawRemoteURL(rawRemoteURL string) (string, error) {
 	if strings.HasPrefix(rawRemoteURL, "git@github.com:") {
-		remoteURL, err = url.Parse("//" + rawRemoteURL)
-	} else {
-		remoteURL, err = url.Parse(rawRemoteURL)
+		return strings.TrimSuffix(strings.Replace(rawRemoteURL, "git@github.com:", "github.com/", 1), ".git"), nil
 	}
+	remoteURL, err := url.Parse(rawRemoteURL)
 	if err != nil {
-		return "", err
+		return "", errors.Wrap(err, "failed to parse remote URL")
 	}
-
-	var repoURI string
-	switch {
-	case strings.HasPrefix(remoteURL.Host, "github.com:") && remoteURL.User != nil && remoteURL.User.Username() == "git":
-		repoURI = strings.Replace(remoteURL.Host, ":", "/", -1) + strings.TrimSuffix(remoteURL.Path, ".git")
-	case remoteURL.Host == "github.com" && remoteURL.Scheme == "https":
-		repoURI = remoteURL.Host + strings.TrimSuffix(remoteURL.Path, ".git")
-	default:
-		return "", errors.New("unrecognized git repository host, supported ones are: github.com")
+	if remoteURL.Host == "github.com" && remoteURL.Scheme == "https" {
+		return remoteURL.Host + strings.TrimSuffix(remoteURL.Path, ".git"), nil
 	}
-
-	return repoURI, nil
+	return "", fmt.Errorf("unrecognized git repository host %q, supported ones are: github.com", remoteURL.Host)
 }
 
 func evalRepoURIWithRemote(dir, remote string) (string, error) {
