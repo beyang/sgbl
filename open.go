@@ -13,18 +13,19 @@ import (
 func (c *Config) runOpen(args []string) {
 	f := flag.NewFlagSet("open", flag.ExitOnError)
 	f.Usage = func() {
-		fmt.Fprintln(os.Stderr, `Usage: sg open [-pos POS] <file>`)
+		fmt.Fprintln(os.Stderr, `Usage: sg open [-pos POS] [-copy] [-print-url] <file>`)
 		f.PrintDefaults()
 	}
 	posFlag := f.String("pos", "", "the position at which to open the file, formatted as \"L${line}:${col}\"")
 	copyOnlyFlag := f.Bool("copy", false, "if set, then the URL will be copied to the clipboard instead of opened")
+	urlOnlyFlag := f.Bool("print-url", false, "if set, then the URL will be printed instead of opened")
 	if err := f.Parse(args); err != nil {
 		f.Usage()
 		os.Exit(1)
 	}
 
 	pathArg := f.Arg(0)
-	if err := c.open(pathArg, *posFlag, *copyOnlyFlag); err != nil {
+	if err := c.open(pathArg, *posFlag, *copyOnlyFlag, *urlOnlyFlag); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
 	}
@@ -55,10 +56,15 @@ func (c *Config) getSourcegraphURL(pathArg string, pos string) (string, error) {
 	return sgURL, nil
 }
 
-func (c *Config) open(pathArg string, pos string, copyOnly bool) error {
+func (c *Config) open(pathArg string, pos string, copyOnly bool, printOnly bool) error {
 	sgURL, err := c.getSourcegraphURL(pathArg, pos)
 	if err != nil {
 		return err
+	}
+
+	if printOnly {
+		fmt.Println(sgURL)
+		return nil
 	}
 
 	if copyOnly {
