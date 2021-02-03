@@ -23,14 +23,18 @@ func evalFilePlusURL(fileURL string, query string, pos string) string {
 	return url
 }
 
-func evalFileURL(sgHost, repoURI, relPath string, isDir bool) string {
+func evalFileURL(sgHost, repoURI, rev, relPath string, isDir bool) string {
+	repoURIRev := repoURI
+	if rev != "" {
+		repoURIRev = fmt.Sprintf("%s@%s", repoURI, rev)
+	}
 	if isDir {
 		if relPath == "" || relPath == "/" {
-			return fmt.Sprintf("%s/%s", sgHost, repoURI)
+			return fmt.Sprintf("%s/%s", sgHost, repoURIRev)
 		}
-		return fmt.Sprintf("%s/%s/-/tree/%s", sgHost, repoURI, relPath)
+		return fmt.Sprintf("%s/%s/-/tree/%s", sgHost, repoURIRev, relPath)
 	}
-	return fmt.Sprintf("%s/%s/-/blob/%s", sgHost, repoURI, relPath)
+	return fmt.Sprintf("%s/%s/-/blob/%s", sgHost, repoURIRev, relPath)
 }
 
 func evalAbsRepoRoot(path string, isDir bool) (string, error) {
@@ -66,6 +70,21 @@ func evalRelPathFromRepoRoot(abspath string, isDir bool) (relPath string, err er
 		return "", errors.New("file path points outside current repository")
 	}
 	return strings.Replace(relPath, string(filepath.Separator), "/", -1), nil
+}
+
+func evalRepoRev(abspath string, isDir bool) (string, error) {
+	rootDir, err := evalAbsRepoRoot(abspath, isDir)
+	if err != nil {
+		return "", err
+	}
+
+	cmd := exec.Command("git", "log", "-n1", `--pretty=format:%H`)
+	cmd.Dir = rootDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 // evalRepoURI returns the Sourcegraph repository URI corresponding to the git repository that

@@ -46,7 +46,7 @@ func (c *Config) search(query string, pathArg string, pos string) error {
 		return err
 	}
 	sgURL := evalFilePlusURL(
-		evalFileURL(c.sourcegraphURLForRepo(repoURI), repoURI, relPath, finfo.IsDir()),
+		evalFileURL(c.sourcegraphURLForRepo(repoURI), repoURI, "", relPath, finfo.IsDir()),
 		query,
 		pos,
 	)
