@@ -1,4 +1,4 @@
-module github.com/beyang/sg
+module github.com/beyang/sgbl
 
 go 1.15
 

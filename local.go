@@ -18,7 +18,7 @@ func (c *Config) runLocal(args []string) {
 	filesFlag := f.String("files", "", "colon-separated list of files to use as anchors for the search for the local file")
 	positionFlag := f.Bool("pos", false, "if true, prints the zero-indexed line/offset, instead of the file")
 	f.Usage = func() {
-		fmt.Fprintln(os.Stderr, `Usage: sg local <url>
+		fmt.Fprintln(os.Stderr, `Usage: sgbl local <url>
 
 Translates a Sourcegraph URL into a local file path`)
 		f.PrintDefaults()

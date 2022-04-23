@@ -25,7 +25,7 @@ func main() {
 func runRoot(args []string) {
 	f := flag.NewFlagSet("root", flag.ExitOnError)
 	f.Usage = func() {
-		fmt.Fprintln(os.Stderr, `Usage: sg {open|search|local} ...`)
+		fmt.Fprintln(os.Stderr, `Usage: sgbl {open|search|local} ...`)
 		f.PrintDefaults()
 	}
 	if err := f.Parse(args); err != nil {
@@ -57,7 +57,7 @@ func readConfig() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	cfgFile, err := os.Open(filepath.Join(usr.HomeDir, ".sg-config"))
+	cfgFile, err := os.Open(filepath.Join(usr.HomeDir, ".sgbl-config"))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &Config{}, nil

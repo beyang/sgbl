@@ -12,7 +12,7 @@ import (
 func (c *Config) runSearch(args []string) {
 	f := flag.NewFlagSet("search", flag.ExitOnError)
 	f.Usage = func() {
-		fmt.Fprintln(os.Stderr, `Usage: sg search [-pos POS] [-path PATH] <query>`)
+		fmt.Fprintln(os.Stderr, `Usage: sgbl search [-pos POS] [-path PATH] <query>`)
 		f.PrintDefaults()
 	}
 	posFlag := f.String("pos", "", "the position at which to open the file, formatted as \"L${line}:${col}\"")

@@ -13,7 +13,7 @@ import (
 func (c *Config) runOpen(args []string) {
 	f := flag.NewFlagSet("open", flag.ExitOnError)
 	f.Usage = func() {
-		fmt.Fprintln(os.Stderr, `Usage: sg open [-pos POS] [-print-url] [-copy] [-rev] <file>`)
+		fmt.Fprintln(os.Stderr, `Usage: sgbl open [-pos POS] [-print-url] [-copy] [-rev] <file>`)
 		f.PrintDefaults()
 	}
 	posFlag := f.String("pos", "", "the position at which to open the file, formatted as \"L${line}:${col}\"")

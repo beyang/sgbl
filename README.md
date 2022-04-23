@@ -1,18 +1,18 @@
-# sg
+# sgbl
 
 A lightweight cli tool to interact with [Sourcegraph](https://sourcegraph.com).
 
 ## Installation
 
 ```bash
-go get github.com/beyang/sg
+go get github.com/beyang/sgbl
 ```
 
 ## Configuration
 
-You can configure `sg` to work with private [Sourcegraph](https://about.sourcegraph.com) instances in addition to Sourcegraph.com.
+You can configure `sgbl` to work with private [Sourcegraph](https://about.sourcegraph.com) instances in addition to Sourcegraph.com.
 
-To do this, save a JSON file like the following to `~/.sg-config`:
+To do this, save a JSON file like the following to `~/.sgbl-config`:
 
 ```json
 {
@@ -32,7 +32,7 @@ To do this, save a JSON file like the following to `~/.sg-config`:
 ## Usage
 
 ```bash
-sg [options] path/to/file
+sgbl [options] path/to/file
 ```
 
 ### Examples
@@ -40,27 +40,27 @@ sg [options] path/to/file
 #### Open a local file
 
 ```bash
-sg main.go
+sgbl main.go
 ```
 
 #### Open a local file at a certain position
 
 ```bash
-sg --line=22 main.go
+sgbl --line=22 main.go
 # or
-sg --line=22 --col=6 main.go
+sgbl --line=22 --col=6 main.go
 # or
-sg --pos=22:6 main.go
+sgbl --pos=22:6 main.go
 ```
 
 #### Execute a search
 
 ```bash
-sg --search="repo:gorilla/mux ^func Test"
+sgbl --search="repo:gorilla/mux ^func Test"
 ```
 
 #### Execute a search over the current repo
 
 ```bash
-sg --search="^func main" .
+sgbl --search="^func main" .
 ```
